@@ -358,6 +358,42 @@ Verified this way on run 36762445452: the build boots, the UI is landscape
 touch axis mapping still needs a tap on a known button (TWRP's lock screen and
 the `twrp` CLI's own page changes make the automated check ambiguous).
 
+## /data decryption via the vendor Keymaster stack (2026-09-30)
+
+The plain AES-GCM path cannot work: `/data/unencrypted/key/` carries a 449-byte
+`keymaster_key_blob`, the GCM tag check fails (`Openssl error: 0`), and the TWRP
+`usesKeymaster()` divergence from AOSP is therefore **correct behaviour, not a
+bug**. The patch that "restored" the AOSP form is removed again.
+
+Decryption now goes through `android::hardware::keymaster::V4_0`
+(`KeyStorage4.cpp` includes `Keymaster4.h`), so recovery has to run a Keymaster
+HIDL service and its QSEE transport. Those live in the private companion
+repository **`YuchangJP/SZJ202-twrp-vendor`**, synced to `vendor/kyocera/szj202`
+and picked up by `TARGET_RECOVERY_DEVICE_DIRS`. The dependency closure was
+derived from each ELF's `DT_NEEDED`:
+
+| from | files |
+| --- | --- |
+| `/vendor/bin` | `qseecomd`, `hw/android.hardware.keymaster@4.0-service-qti` |
+| `/vendor/lib64` | `libQSEEComAPI`, `libqtikeymaster4`, `libkeymasterdeviceutils`, `libkeymasterutils`, `libkeymasterprovision`, `libdrmfs`, `libdiag` |
+| `/system/lib64` | `libion`, `libxml2` (absent from TWRP's ramdisk) |
+
+Everything else (`hwservicemanager`, `libhidlbase`, `libhidltransport`,
+`libhwbinder`, `libbase`, `libc++`, `libcrypto`, `android.hardware.keymaster@4.0`)
+is already in TWRP's recovery ramdisk.
+
+`recovery/root/init.recovery.qcom.rc` now mounts the modem partition at
+`/firmware` (qseecomd loads the Keymaster TA from `/firmware/image`), starts
+`hwservicemanager`, and on `hwservicemanager.ready` starts `vendor.qseecomd` and
+`keymaster-4-0` — the same ordering the vendor init uses.
+
+CI clones the private repository with `secrets.VENDOR_REPO_TOKEN`; the device
+tree and workflow are otherwise unchanged. Result: run 36768963127,
+`recovery.img` 32,348,160 bytes.
+
+**Not yet verified on hardware** — the device dropped off ADB before the new
+image could be written.
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0
