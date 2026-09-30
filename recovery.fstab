@@ -10,10 +10,8 @@
 /dev/block/bootdevice/by-name/system        /system              ext4     ro,barrier=1                                                wait
 /dev/block/bootdevice/by-name/vendor        /vendor              ext4     ro,barrier=1                                                wait
 /dev/block/bootdevice/by-name/cache         /cache               ext4     noatime,nosuid,nodev,barrier=1,data=ordered                 wait,check
-# TWRP crypto support is off (see BoardConfig.mk), so /data carries no
-# encryption flags: TWRP mounts the ext4 filesystem and the kernel keeps
-# per-file FBE policies transparent. Backup/restore of the raw /data still
-# works; individual CE files stay unreadable without the TEE-wrapped key.
+# TWRP crypto support is on, and Decrypt_FBE_DE() detects FBE from
+# /data/unencrypted/key/version, so no encryption flag is needed here.
 /dev/block/bootdevice/by-name/userdata      /data                ext4     noatime,nosuid,nodev,barrier=1,data=ordered,noauto_da_alloc wait,check
 /dev/block/bootdevice/by-name/persist       /persist             ext4     nosuid,nodev,barrier=1,noauto_da_alloc                      wait,check
 /dev/block/bootdevice/by-name/sysprop       /mnt/vendor/pstore   ext4     nosuid,nodev,barrier=1,noauto_da_alloc,data=journal,errors=panic wait,check,nofail
@@ -26,6 +24,9 @@
 /dev/block/bootdevice/by-name/dtbo          /dtbo                emmc     defaults                                                    defaults
 /dev/block/bootdevice/by-name/modem         /firmware            vfat     ro,shortname=lower,uid=1000,gid=1000,dmask=0227,fmask=0337  wait
 
-# Removable storage.
-/dev/block/mmcblk1p1                        /external_sd         auto     defaults                                                    wait
-/dev/block/sda1                             /usb_otg             auto     defaults                                                    wait
+# Removable storage, in TWRP's own fstab format (mount point first, so TWRP
+# treats it as version 1 and honours the flags). The previous AOSP-style entry
+# carried "wait", which made TWRP block and report a mount error at boot for
+# /usb_otg even when nothing was attached.
+/external_sd                                auto    /dev/block/mmcblk1p1    /dev/block/mmcblk1    flags=display="MicroSD";storage;wipeingui;removable
+/usb_otg                                    auto    /dev/block/sda1         /dev/block/sda        flags=display="USB OTG";storage;wipeingui;removable
