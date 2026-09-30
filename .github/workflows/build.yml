@@ -86,15 +86,23 @@ jobs:
           sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet
           df -h > diagnostics/disk-after-cleanup.txt
 
-      - name: Configure 12 GB swap
+      - name: Configure swap
         if: inputs.stage != 'validate'
         shell: bash
         run: |
           set -euo pipefail
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          # The hosted runner may already carry an active /swapfile, so never
+          # reuse that path (fallocate then fails with "Text file busy").
+          if swapon --show | grep -q .; then
+            echo 'swap already active on the runner; keeping it'
+          else
+            swapfile="$RUNNER_TEMP/swapfile"
+            sudo fallocate -l 12G "$swapfile" ||
+              sudo dd if=/dev/zero of="$swapfile" bs=1M count=12288 status=none
+            sudo chmod 600 "$swapfile"
+            sudo mkswap "$swapfile" >/dev/null
+            sudo swapon "$swapfile"
+          fi
           free -h | tee diagnostics/memory.txt
 
       - name: Install build dependencies
