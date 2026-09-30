@@ -88,6 +88,15 @@ hash before the build. The matching GPL kernel source is the OEM package
   (stage `recoveryimage`, second ADB fix) failed identically: moving the line
   to `device.mk` did not help, because product makefiles are parsed *before*
   `main.mk`'s check. Replaced with `PRODUCT_DEFAULT_PROPERTY_OVERRIDES`.
+* [Run 36749009540](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36749009540)
+  (stage `recoveryimage`) succeeded in 18m7s with the USB init scripts:
+  `recovery.img` 31,606,784 bytes, `init.recovery.usb.rc` +
+  `init.recovery.qcom.rc` packaged, `ro.adb.secure=0`.
+* [Run 36754459715](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36754459715)
+  (stage `recoveryimage`) succeeded in 14m30s with crypto disabled:
+  `recovery.img` 30,009,344 bytes. `e4crypt_initialize_global_de` and
+  `retrieveAndInstallKey` are absent from `sbin/recovery`, and the `/data` fstab
+  entry carries no `encryptable` flag.
 
 ## Milestones
 
