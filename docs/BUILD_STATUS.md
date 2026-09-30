@@ -332,6 +332,32 @@ those are present, patch 1 must be dropped so TWRP takes the Keymaster path.
 and only log `I:Unable to mount` with `Actual block device: ''` because no card
 or stick is attached; the fstab/parse error is gone.
 
+## Self-debugging from TWRP over ADB (2026-09-30)
+
+The device can be updated and inspected without fastboot:
+
+* `adb push` **does not** write a block device from TWRP's adbd (the partition
+  still held the old image afterwards). Push to `/tmp` and `dd` instead:
+
+  ```
+  adb push recovery.img /tmp/new-recovery.img
+  adb shell "dd if=/tmp/new-recovery.img of=/dev/block/by-name/recovery bs=1048576"
+  adb reboot recovery
+  ```
+
+  Read the partition back with `dd if=... of=/tmp/rb.img` and compare; a
+  `head -c N /dev/block/mmcblk0p54 | sha256sum` read can return stale data.
+* The framebuffer can be captured and turned into a real screenshot:
+  `dd if=/dev/graphics/fb0 of=/tmp/fb.raw bs=4096 count=2000`, pull it, then
+  decode `800x1280x32` RGBX at stride 3200 and rotate by 90.
+* Touch can be driven from the host by writing `input_event` records to
+  `/dev/input/event2` (`dd ... bs=24`); synthetic taps do reach TWRP.
+
+Verified this way on run 36762445452: the build boots, the UI is landscape
+1280x800, the strings are Japanese, and synthetic taps change pages. The exact
+touch axis mapping still needs a tap on a known button (TWRP's lock screen and
+the `twrp` CLI's own page changes make the automated check ambiguous).
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0
