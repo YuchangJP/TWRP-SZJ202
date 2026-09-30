@@ -93,6 +93,3 @@ TW_USE_MODEL_HARDWARE_ID_FOR_DEVICE_ID := true
 TW_DEVICE_VERSION := SZJ202-1
 RECOVERY_SDCARD_ON_DATA := true
 BOARD_HAS_NO_SELECT_BUTTON := true
-
-# adbd must not wait for an authorised key; this is a recovery build.
-ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
