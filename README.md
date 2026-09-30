@@ -62,13 +62,15 @@ The finished `recovery.img` is uploaded as a workflow artifact.
 
 | | |
 | --- | --- |
-| Run | [36749009540](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36749009540) (stage `recoveryimage`, 18m7s, success) |
-| Image | `recovery.img`, 31,606,784 bytes, SHA-256 `e47193e95f0cb42120e06bf6341ed341eea38c93234d642b813da37a8787bd91` |
-| Release | [twrp-9.0-szj202-r36749009540](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36749009540) |
+| Run | [36754459715](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36754459715) (stage `recoveryimage`, 14m30s, success) |
+| Image | `recovery.img`, 30,009,344 bytes, SHA-256 `0e8327b71ab2945d007649d9d638b0fdbff9047ffc7a145f227004ec558db32e` |
+| Release | [twrp-9.0-szj202-r36754459715](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36754459715) |
 
-This build adds the USB init scripts the device needs, so ADB works; see the
-"Recovery boots, but no ADB" section of [docs/BUILD_STATUS.md](docs/BUILD_STATUS.md)
-for the diagnosis. Build progress and every CI iteration are recorded there too.
+ADB works (configfs USB gadget) and the UI no longer hangs: TWRP's crypto/FBE
+support is disabled because this unit's FBE key is TEE-wrapped and would
+deadlock the UI without the vendor Keymaster stack. `/data` therefore mounts as
+plain ext4 and per-file encrypted contents stay unreadable. Details in
+[docs/BUILD_STATUS.md](docs/BUILD_STATUS.md).
 
 ## Flashing (manual, device owner's responsibility)
 
