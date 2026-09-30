@@ -62,12 +62,13 @@ The finished `recovery.img` is uploaded as a workflow artifact.
 
 | | |
 | --- | --- |
-| Run | [36737914000](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36737914000) (stage `recoveryimage`, 15m55s, success) |
-| Image | `recovery.img`, 31,604,736 bytes, SHA-256 `2a43cc83665edeecca13f3ae810b0888640a50bf6a574d85e52a75bde5e050f8` |
-| Release | [twrp-9.0-szj202-r36737914000](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36737914000) |
+| Run | [36749009540](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36749009540) (stage `recoveryimage`, 18m7s, success) |
+| Image | `recovery.img`, 31,606,784 bytes, SHA-256 `e47193e95f0cb42120e06bf6341ed341eea38c93234d642b813da37a8787bd91` |
+| Release | [twrp-9.0-szj202-r36749009540](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36749009540) |
 
-Build progress and every CI iteration are recorded in
-[docs/BUILD_STATUS.md](docs/BUILD_STATUS.md).
+This build adds the USB init scripts the device needs, so ADB works; see the
+"Recovery boots, but no ADB" section of [docs/BUILD_STATUS.md](docs/BUILD_STATUS.md)
+for the diagnosis. Build progress and every CI iteration are recorded there too.
 
 ## Flashing (manual, device owner's responsibility)
 
