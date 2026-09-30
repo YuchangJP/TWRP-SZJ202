@@ -99,9 +99,40 @@ hash before the build. The matching GPL kernel source is the OEM package
 | Device tree authored | Yes | `twrp-9.0` branch. |
 | Prebuilt kernel published | Yes | Release `prebuilt-kernel-1.110JS.0151.a`. |
 | `recovery.img` build | Yes, structural | Run 36737914000 produced a 31,604,736-byte `recovery.img`. |
-| Device boot / display | Yes | Run 36737914000 flashed and booted on hardware. |
-| ADB over USB | Fixed, unverified on device | USB init scripts added; run 36749009540. |
-| Storage / touch / radios | Untested | Requires the user on hardware. |
+| Device boot / display | Yes | Flashed and booted on hardware. |
+| ADB over USB | **Yes, verified** | See the section below. |
+| Storage / touch | Yes, verified | Read-only ADB checks; see below. |
+| Radios (modem/Wi-Fi/BT) | Untested | Requires the user on hardware. |
+
+## Hardware verification (2026-09-30)
+
+The r36749009540 image was flashed and queried over ADB (read-only; nothing was
+written, wiped or flashed from the tooling).
+
+| Item | Result |
+| --- | --- |
+| ADB | `KB18K627078 recovery product:omni_szj202 model:SZJ_JS202 device:szj202`; root shell (`uid=0`, `u:r:su:s0`) |
+| TWRP | `3.7.0_9-SZJ202-1` |
+| USB | `sys.usb.config=adb`, `sys.usb.configfs=1`, `sys.usb.ffs.ready=1`, UDC bound to `msm_hsusb`; dmesg shows the `sys.usb.ffs.ready=1` action from `/init.recovery.qcom.rc` and `USB_STATE=CONNECTED`/`CONFIGURED` |
+| Display | fbdev, `framebuffer: 0 (800 x 1280)`; `portrait_hdpi` theme scaled 0.740741 x 0.666667 |
+| Panel | bootloader cmdline `...qcom,mdss_dsi_kc_boe_ilitek_wxga_video...` with `androidboot.dtbo_idx=22` |
+| Touch / keys | `goodix-ts` (event2), `gpio-keys` (event5), `qpnp_pon` (event0), `Wacom I2C Digitizer` (event1) |
+| `/system` | mounts read-only; dm-verity is active (`root=/dev/dm-0`, `androidboot.veritymode=enforcing`) |
+| `/vendor`, `/cache`, `/data`, `/firmware` | all mount; `/data` FBE unwrapped from `/data/unencrypted/key` |
+| RTC | corrected from `/persist/time/ats_2` |
+| Bootloader | `androidboot.verifiedbootstate=orange` (unlocked) |
+| SELinux | permissive (bring-up); all audit denials carry `permissive=1` |
+
+Cosmetic findings, no action taken:
+
+* `I:Unhandled flag: 'nofail'` — TWRP does not recognise the `nofail` flag on the
+  `/mnt/vendor/pstore` entry; it is ignored.
+* USB mass-storage mode is unavailable (`Lun file
+  '/sys/class/android_usb/android0/f_mass_storage/lun0/file' does not exist`),
+  because the device is a configfs gadget. ADB is unaffected; UMS would need a
+  `mass_storage` function in the gadget.
+* dm-verity on `/system` means the stock system cannot be modified in place
+  without disabling verity.
 
 ## Recovery boots, but no ADB (2026-09-30)
 
