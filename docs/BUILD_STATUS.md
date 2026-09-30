@@ -85,6 +85,41 @@ hash before the build. The matching GPL kernel source is the OEM package
 | `recovery.img` build | Yes, structural | Run 36737914000 produced a 31,604,736-byte `recovery.img`. |
 | Device boot / display / touch | Untested | Requires flashing; not performed here. |
 
+## Recovery boots, but no ADB (2026-09-30)
+
+The first flashed image (run 36737914000) booted on hardware but did not appear
+over USB. Analysing the built ramdisk showed why:
+
+* TWRP's `init.rc` declares `adbd` as a **disabled** service and comments out
+  the `ro.debuggable=1` auto-start. `adbd` is therefore only ever started by
+  `init.recovery.usb.rc` through `on property:sys.usb.config=adb`.
+* The same `init.rc` imports `/init.recovery.usb.rc` and
+  `/init.recovery.${ro.hardware}.rc` (= `init.recovery.qcom.rc`), but the
+  ramdisk contained **neither file**.
+* `TW_EXCLUDE_DEFAULT_USB_INIT := true` had removed TWRP's
+  `init.recovery.usb.rc`, and no device-side `init.recovery.qcom.rc` was ever
+  supplied, so nothing configured the USB gadget and nothing ever started
+  `adbd`.
+
+TWRP's stock `init.recovery.usb.rc` only speaks the **legacy**
+`/sys/class/android_usb/android0` interface, while this device is a **configfs**
+gadget (`androidboot.usbconfigfs=true`; the factory recovery builds
+`/config/usb_gadget/g1` with `idVendor 0x18d1`, `idProduct 0xd001`, `ffs.adb`
+and binds the UDC when `sys.usb.ffs.ready=1`).
+
+Fixes:
+
+* Removed `TW_EXCLUDE_DEFAULT_USB_INIT` so TWRP's `init.recovery.usb.rc` is
+  packaged again.
+* Added `recovery/root/init.recovery.qcom.rc` (packaged through
+  `TARGET_RECOVERY_DEVICE_DIRS`) with the factory configfs gadget setup, the
+  `sys.usb.ffs.ready=1` UDC bind, the `/dev/block/bootdevice` symlink and an
+  explicit `start adbd` on `on boot`.
+* Added `ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0` so adbd does not
+  wait for an authorised key.
+* Appended `androidboot.selinux=permissive` to the cmdline for bring-up, so the
+  configfs writes from `init` are not blocked before TWRP relaxes policy.
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0
