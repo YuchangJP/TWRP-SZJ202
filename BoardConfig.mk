@@ -80,23 +80,27 @@ TARGET_RECOVERY_QCOM_RTC_FIX := true
 TARGET_OTA_ASSERT_DEVICE := szj202,SZJ202
 
 # ----------------------------------------------------------------------- TWRP
-TW_THEME := portrait_hdpi
+# The panel is a native 800x1280 portrait DSI panel (kc boe ilitek wxga), so the
+# drawing is rotated to get a 1280x800 landscape UI. `persist.twrp.rotation`
+# overrides TW_ROTATION at runtime if 90 turns out to be the wrong direction.
+TW_THEME := landscape_hdpi
+TW_ROTATION := 90
 TW_SCREEN_BLANK_ON_BOOT := true
 TW_USE_TOOLBOX := true
 # Do NOT set TW_EXCLUDE_DEFAULT_USB_INIT: TWRP's etc/init.recovery.usb.rc is
 # what starts adbd on "sys.usb.config=adb". The configfs gadget itself is set
 # up by this device's recovery/root/init.recovery.qcom.rc.
 TW_EXCLUDE_TWRPAPP := true
-# Crypto/FBE is deliberately disabled for now. /data/unencrypted/key holds a
-# 449-byte keymaster_key_blob (the FBE key is wrapped by the TEE), and TWRP's
-# FBE init (e4crypt_initialize_global_de) deadlocks without the vendor Keymaster
-# HAL, which is not shipped here -- the recovery then hangs on the splash
-# screen. Enabling TW_INCLUDE_CRYPTO also force-enables TW_INCLUDE_FBE and
-# TW_INCLUDE_FBE_METADATA_DECRYPT, so there is no FBE-only switch.
-# Re-enabling /data decryption later requires the vendor Keymaster stack from a
-# private blob repository.
-TW_INCLUDE_CRYPTO := false
 TW_EXTRA_LANGUAGES := true
+TW_DEFAULT_LANGUAGE := ja
+# Crypto/FBE is on again. TWRP's KeyAuthentication::usesKeymaster() drops the
+# '!' before secret.empty() compared with AOSP, so an empty authentication (the
+# FBE device key) wrongly took the Keymaster path and deadlocked recovery, which
+# has no Keymaster HAL. The build patches that back to the AOSP form, makes
+# recovery create its own "e4crypt" keyring, and disables the wrapped-key retry
+# so a failure cannot deadlock. See the workflow's patch step and
+# docs/BUILD_STATUS.md.
+TW_INCLUDE_CRYPTO := true
 TW_USE_MODEL_HARDWARE_ID_FOR_DEVICE_ID := true
 TW_DEVICE_VERSION := SZJ202-1
 RECOVERY_SDCARD_ON_DATA := true

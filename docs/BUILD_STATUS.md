@@ -230,6 +230,50 @@ contents stay unreadable. Restoring /data decryption later requires shipping
 that Keymaster stack (and running `hwservicemanager`) from a private blob
 repository — never this public tree.
 
+## /data decryption, landscape, USB OTG and Japanese (2026-09-30)
+
+The splash hang was finally localised by reading TWRP's source against this
+device. TWRP's `crypto/ext4crypt/KeyStorage3.h` and `KeyStorage4.h` define
+
+```cpp
+bool usesKeymaster() const { return !token.empty() || secret.empty(); };
+```
+
+where AOSP has `!secret.empty()`. With the empty `KeyAuthentication` that
+`Decrypt_DE()` passes for the FBE device key, the first term is already true, so
+TWRP took the Keymaster path: `KeyStorage4::retrieveKey()` constructs
+`android::vold::Keymaster`, which calls
+`android::hardware::keymaster::V4_0::IKeymasterDevice::getService()`. Recovery
+has no hwservicemanager-registered Keymaster service, so that call blocks in a
+futex and the UI never leaves the splash screen.
+
+The device key is **not** Keymaster-wrapped: `/data/unencrypted/key/encrypted_key`
+is 92 bytes = 12-byte GCM nonce + 64-byte key + 16-byte tag, and `stretching` is
+`nopassword`. The AOSP code path therefore decrypts it without the TEE.
+
+The build now applies three patches to the synced TWRP sources (workflow step
+"Patch TWRP FBE sources for this device"); the step fails the build if any patch
+does not apply:
+
+| Patch | Why |
+| --- | --- |
+| `KeyStorage3.h`, `KeyStorage4.h`: `secret.empty()` → `!secret.empty()` | restores the AOSP `usesKeymaster()`; the device key is not Keymaster-backed |
+| `KeyUtil.cpp`: create the `e4crypt` keyring when `keyctl_search()` misses | nothing in recovery creates it, so installing any key would fail |
+| `partition.cpp`: drop the `fbe.data.wrappedkey=true` retry | that retry needs the Keymaster HAL and would deadlock; a failure now only logs |
+
+Other changes in the same build:
+
+* **Landscape UI** — `TW_THEME := landscape_hdpi` plus `TW_ROTATION := 90`. The
+  panel is a native 800x1280 portrait DSI panel, so the drawing is rotated to
+  give a 1280x800 UI. `persist.twrp.rotation` overrides the direction at
+  runtime, so 270 can be tried without rebuilding.
+* **USB OTG / external SD** — the AOSP-style fstab lines carried `wait`, which
+  made TWRP block and report a mount error for `/usb_otg` at boot even with
+  nothing attached. Both entries now use TWRP's own fstab format (mount point
+  first) with `flags=display=...;storage;wipeingui;removable`.
+* **Default language** — `TW_DEFAULT_LANGUAGE := ja`; TWRP ships
+  `twres/languages/ja.xml`.
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0

@@ -178,6 +178,72 @@ jobs:
           test -f device/kyocera/szj202/BoardConfig.mk
           test -f device/kyocera/szj202/recovery.fstab
 
+      - name: Patch TWRP FBE sources for this device
+        if: inputs.stage == 'recoveryimage'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, sys
+
+          root = pathlib.Path("workspace/bootable/recovery/crypto/ext4crypt")
+          problems = []
+
+          # 1. TWRP's KeyAuthentication::usesKeymaster() drops the '!' AOSP has before
+          #    secret.empty(), so an empty authentication (the FBE device key) is
+          #    wrongly treated as Keymaster-backed. Recovery ships no Keymaster HAL,
+          #    so android::hardware::keymaster::getService() deadlocks and the UI
+          #    never leaves the splash screen.
+          bad = "return !token.empty() || secret.empty();"
+          good = "return !token.empty() || !secret.empty();"
+          hits = 0
+          for p in sorted(root.glob("KeyStorage*.h")):
+              s = p.read_text()
+              if bad in s:
+                  p.write_text(s.replace(bad, good))
+                  hits += 1
+                  print("patched usesKeymaster in", p.name)
+          if hits == 0:
+              problems.append("usesKeymaster patch did not apply")
+
+          # 2. Nothing in recovery creates the "e4crypt" keyring that installKey()
+          #    searches for, so key installation would always fail.
+          p = root / "KeyUtil.cpp"
+          s = p.read_text()
+          bad2 = '        PLOG(ERROR) << "Unable to find device keyring" << std::endl;\n        return false;'
+          good2 = ('        *device_keyring = add_key("keyring", "e4crypt", nullptr, 0,\n'
+                   '                            KEY_SPEC_SESSION_KEYRING);\n'
+                   '        if (*device_keyring == -1) {\n'
+                   '            PLOG(ERROR) << "Unable to create device keyring" << std::endl;\n'
+                   '            return false;\n'
+                   '        }\n'
+                   '        LOG(DEBUG) << "Created device keyring " << *device_keyring << std::endl;')
+          if bad2 in s:
+              p.write_text(s.replace(bad2, good2, 1))
+              print("patched e4cryptKeyring in", p.name)
+          else:
+              problems.append("keyring patch did not apply")
+
+          # 3. If the device key cannot be decrypted, TWRP retries with
+          #    fbe.data.wrappedkey=true, which needs the Keymaster HAL and would
+          #    deadlock this device. Fail gracefully instead.
+          p = pathlib.Path("workspace/bootable/recovery/partition.cpp")
+          s = p.read_text()
+          bad3 = 'property_set("fbe.data.wrappedkey", "true");'
+          if bad3 in s:
+              p.write_text(s.replace(
+                  bad3, '/* patched: no Keymaster HAL in recovery; do not retry as wrapped */', 1))
+              print("patched wrapped-key retry in", p.name)
+          else:
+              problems.append("wrapped-key retry patch did not apply")
+
+          if problems:
+              print("TWRP patches failed: " + "; ".join(problems), file=sys.stderr)
+              sys.exit(1)
+          PY
+          grep -n "usesKeymaster" workspace/bootable/recovery/crypto/ext4crypt/KeyStorage4.h
+          grep -n "Created device keyring" workspace/bootable/recovery/crypto/ext4crypt/KeyUtil.cpp
+
       - name: Provide kernel image
         if: inputs.stage == 'recoveryimage'
         shell: bash
