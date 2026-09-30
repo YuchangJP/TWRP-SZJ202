@@ -100,8 +100,9 @@ hash before the build. The matching GPL kernel source is the OEM package
 | Prebuilt kernel published | Yes | Release `prebuilt-kernel-1.110JS.0151.a`. |
 | `recovery.img` build | Yes, structural | Run 36737914000 produced a 31,604,736-byte `recovery.img`. |
 | Device boot / display | Yes | Flashed and booted on hardware. |
-| ADB over USB | **Yes, verified** | See the section below. |
-| Storage / touch | Yes, verified | Read-only ADB checks; see below. |
+| ADB over USB | **Yes, verified** | See the hardware verification section. |
+| Storage / touch / partitions | Yes, verified | Read-only ADB checks; see below. |
+| TWRP UI / main menu | Blocked then fixed | FBE init deadlock; crypto disabled in the next build. |
 | Radios (modem/Wi-Fi/BT) | Untested | Requires the user on hardware. |
 
 ## Hardware verification (2026-09-30)
@@ -168,6 +169,57 @@ Fixes:
   wait for an authorised key.
 * Appended `androidboot.selinux=permissive` to the cmdline for bring-up, so the
   configfs writes from `init` are not blocked before TWRP relaxes policy.
+
+## Recovery hangs on the splash screen (2026-09-30)
+
+With ADB working, the recovery was found not to advance past the TWRP splash.
+Diagnosed read-only over ADB on the r36749009540 image:
+
+* `recovery` (pid 344) has a **single thread parked in `futex_wait_queue_me`** —
+  a userspace deadlock, not I/O and not CPU spin.
+* `/tmp/recovery.log` (3249 bytes, not growing) ends at:
+
+  ```
+  I:File Based Encryption is present
+  e4crypt_initialize_global_de
+  Determining wrapped-key support for /data
+  fbe.data.wrappedkey = false
+  calling retrieveAndInstallKey
+  Key exists, using: /data/unencrypted/key
+  ```
+
+* That is `crypto/ext4crypt/Ext4CryptPie.cpp` → `android::vold::retrieveAndInstallKey()`.
+  It never returns; `partition.cpp` calls it from the `#ifdef TW_INCLUDE_FBE`
+  block (`while (!Decrypt_DE() && --retry_count)`), so the UI thread never
+  reaches the main menu.
+
+Cause: `TW_INCLUDE_CRYPTO := true` also force-enables `TW_INCLUDE_FBE` and
+`TW_INCLUDE_FBE_METADATA_DECRYPT` (TWRP `Android.mk`), so TWRP tries to unwrap
+the FBE key. On this unit `/data/unencrypted/key/` contains:
+
+| file | size |
+| --- | --- |
+| `encrypted_key` | 92 B |
+| `keymaster_key_blob` | 449 B |
+| `secdiscardable` | 16384 B |
+| `stretching` | 10 B (`nopassword`) |
+| `version` | 1 B (`1`) |
+
+`keymaster_key_blob` means the key is wrapped by the device's Keymaster (QSEE)
+key, so unwrapping needs the vendor keymaster stack, which this blob-free tree
+does not ship. The vendor partition does have it:
+`/vendor/lib64/hw/android.hardware.keymaster@3.0-impl-qti.so`,
+`libQSEEComAPI.so`, `libkeymasterdeviceutils.so`, `libkeymasterprovision.so`,
+`libkeymasterutils.so`, `libqtikeymaster4.so`, `/vendor/bin/qseecomd`,
+`/vendor/bin/hw/android.hardware.keymaster@{3.0,4.0}-service-qti`.
+
+Fix: `TW_INCLUDE_CRYPTO := false`, and the `encryptable=footer` flag removed
+from the `/data` fstab entry so TWRP mounts /data as a plain ext4 filesystem.
+
+Consequence: TWRP boots, flashes, wipes and backs up, but per-file encrypted
+contents stay unreadable. Restoring /data decryption later requires shipping
+that Keymaster stack (and running `hwservicemanager`) from a private blob
+repository — never this public tree.
 
 ## Known bring-up risks
 

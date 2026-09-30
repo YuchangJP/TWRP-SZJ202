@@ -87,7 +87,15 @@ TW_USE_TOOLBOX := true
 # what starts adbd on "sys.usb.config=adb". The configfs gadget itself is set
 # up by this device's recovery/root/init.recovery.qcom.rc.
 TW_EXCLUDE_TWRPAPP := true
-TW_INCLUDE_CRYPTO := true
+# Crypto/FBE is deliberately disabled for now. /data/unencrypted/key holds a
+# 449-byte keymaster_key_blob (the FBE key is wrapped by the TEE), and TWRP's
+# FBE init (e4crypt_initialize_global_de) deadlocks without the vendor Keymaster
+# HAL, which is not shipped here -- the recovery then hangs on the splash
+# screen. Enabling TW_INCLUDE_CRYPTO also force-enables TW_INCLUDE_FBE and
+# TW_INCLUDE_FBE_METADATA_DECRYPT, so there is no FBE-only switch.
+# Re-enabling /data decryption later requires the vendor Keymaster stack from a
+# private blob repository.
+TW_INCLUDE_CRYPTO := false
 TW_EXTRA_LANGUAGES := true
 TW_USE_MODEL_HARDWARE_ID_FOR_DEVICE_ID := true
 TW_DEVICE_VERSION := SZJ202-1
