@@ -99,7 +99,9 @@ hash before the build. The matching GPL kernel source is the OEM package
 | Device tree authored | Yes | `twrp-9.0` branch. |
 | Prebuilt kernel published | Yes | Release `prebuilt-kernel-1.110JS.0151.a`. |
 | `recovery.img` build | Yes, structural | Run 36737914000 produced a 31,604,736-byte `recovery.img`. |
-| Device boot / display / touch | Untested | Requires flashing; not performed here. |
+| Device boot / display | Yes | Run 36737914000 flashed and booted on hardware. |
+| ADB over USB | Fixed, unverified on device | USB init scripts added; run 36749009540. |
+| Storage / touch / radios | Untested | Requires the user on hardware. |
 
 ## Recovery boots, but no ADB (2026-09-30)
 
