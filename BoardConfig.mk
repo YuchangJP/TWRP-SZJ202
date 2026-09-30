@@ -45,8 +45,11 @@ BOARD_MKBOOTIMG_ARGS += --kernel_offset $(BOARD_KERNEL_OFFSET)
 BOARD_MKBOOTIMG_ARGS += --ramdisk_offset $(BOARD_RAMDISK_OFFSET)
 BOARD_MKBOOTIMG_ARGS += --tags_offset $(BOARD_KERNEL_TAGS_OFFSET)
 
-# Byte-identical to the stock boot/recovery header cmdline.
-BOARD_KERNEL_CMDLINE := console=ttyMSM0,115200,n8 androidboot.console=ttyMSM0 androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 androidboot.bootdevice=7824900.sdhci earlycon=msm_serial_dm,0x78B0000 firmware_class.path=/vendor/firmware_mnt/image androidboot.usbconfigfs=true loop.max_part=7
+# Byte-identical to the stock boot/recovery header cmdline, plus
+# androidboot.selinux=permissive for bring-up: the configfs USB gadget is
+# created from init before TWRP switches policy, and the stock recovery's
+# policy is not ours.
+BOARD_KERNEL_CMDLINE := console=ttyMSM0,115200,n8 androidboot.console=ttyMSM0 androidboot.hardware=qcom msm_rtb.filter=0x237 ehci-hcd.park=3 lpm_levels.sleep_disabled=1 androidboot.bootdevice=7824900.sdhci earlycon=msm_serial_dm,0x78B0000 firmware_class.path=/vendor/firmware_mnt/image androidboot.usbconfigfs=true loop.max_part=7 androidboot.selinux=permissive
 
 # No dt image is packed; the bootloader reads /dtbo.
 BOARD_KERNEL_SEPARATED_DT := false
@@ -80,7 +83,9 @@ TARGET_OTA_ASSERT_DEVICE := szj202,SZJ202
 TW_THEME := portrait_hdpi
 TW_SCREEN_BLANK_ON_BOOT := true
 TW_USE_TOOLBOX := true
-TW_EXCLUDE_DEFAULT_USB_INIT := true
+# Do NOT set TW_EXCLUDE_DEFAULT_USB_INIT: TWRP's etc/init.recovery.usb.rc is
+# what starts adbd on "sys.usb.config=adb". The configfs gadget itself is set
+# up by this device's recovery/root/init.recovery.qcom.rc.
 TW_EXCLUDE_TWRPAPP := true
 TW_INCLUDE_CRYPTO := true
 TW_EXTRA_LANGUAGES := true
@@ -89,5 +94,5 @@ TW_DEVICE_VERSION := SZJ202-1
 RECOVERY_SDCARD_ON_DATA := true
 BOARD_HAS_NO_SELECT_BUTTON := true
 
-# -------------------------------------------------------------------- SELinux
-BOARD_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy
+# adbd must not wait for an authorised key; this is a recovery build.
+ADDITIONAL_DEFAULT_PROPERTIES += ro.adb.secure=0
