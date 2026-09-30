@@ -81,8 +81,13 @@ hash before the build. The matching GPL kernel source is the OEM package
   be set before here: ro.adb.secure=0.
   ```
 
-  `ADDITIONAL_DEFAULT_PROPERTIES` is only legal from a product makefile, so
-  `ro.adb.secure=0` moved from `BoardConfig.mk` to `device.mk`.
+  `ADDITIONAL_DEFAULT_PROPERTIES` may not be set at all before that point, in
+  either `BoardConfig.mk` or a product makefile. The property now uses the
+  product-scoped variable `PRODUCT_DEFAULT_PROPERTY_OVERRIDES`.
+* [Run 36747585990](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36747585990)
+  (stage `recoveryimage`, second ADB fix) failed identically: moving the line
+  to `device.mk` did not help, because product makefiles are parsed *before*
+  `main.mk`'s check. Replaced with `PRODUCT_DEFAULT_PROPERTY_OVERRIDES`.
 
 ## Milestones
 

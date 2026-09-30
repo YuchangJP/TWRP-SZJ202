@@ -8,9 +8,9 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.sf.lcd_density=160
 
 # adbd must not wait for an authorised key; this is a recovery build.
-# Must live here (not in BoardConfig.mk): build/make/core/main.mk rejects
-# ADDITIONAL_DEFAULT_PROPERTIES being set before the product makefiles.
-ADDITIONAL_DEFAULT_PROPERTIES += \
+# Must be the product-scoped variable: build/make/core/main.mk hard-errors if
+# ADDITIONAL_DEFAULT_PROPERTIES is already set when it reads the products.
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
     ro.adb.secure=0
 
 # Pick up recovery/root/ files from this device directory.
