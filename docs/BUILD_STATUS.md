@@ -97,6 +97,12 @@ hash before the build. The matching GPL kernel source is the OEM package
   `recovery.img` 30,009,344 bytes. `e4crypt_initialize_global_de` and
   `retrieveAndInstallKey` are absent from `sbin/recovery`, and the `/data` fstab
   entry carries no `encryptable` flag.
+* [Run 36758399531](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36758399531)
+  (stage `recoveryimage`) succeeded in 21m41s with crypto, landscape, USB OTG
+  and Japanese: `recovery.img` 31,606,784 bytes. The patch step applied all
+  three TWRP patches; `sbin/libe4crypt.so` contains `e4crypt_initialize_global_de`
+  and the patched `Created device keyring`, and the ramdisk carries
+  `twres/landscape.xml` (no `portrait.xml`) plus `twres/languages/ja.xml`.
 
 ## Milestones
 
@@ -111,7 +117,8 @@ hash before the build. The matching GPL kernel source is the OEM package
 | Device boot / display | Yes | Flashed and booted on hardware. |
 | ADB over USB | **Yes, verified** | See the hardware verification section. |
 | Storage / touch / partitions | Yes, verified | Read-only ADB checks; see below. |
-| TWRP UI / main menu | Blocked then fixed | FBE init deadlock; crypto disabled in the next build. |
+| TWRP UI / main menu | Fixed, unverified | Crypto patch applied; run 36758399531. |
+| /data (FBE) decryption | Implemented, unverified | Same run; proof requires flashing. |
 | Radios (modem/Wi-Fi/BT) | Untested | Requires the user on hardware. |
 
 ## Hardware verification (2026-09-30)

@@ -62,15 +62,14 @@ The finished `recovery.img` is uploaded as a workflow artifact.
 
 | | |
 | --- | --- |
-| Run | [36754459715](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36754459715) (stage `recoveryimage`, 14m30s, success) |
-| Image | `recovery.img`, 30,009,344 bytes, SHA-256 `0e8327b71ab2945d007649d9d638b0fdbff9047ffc7a145f227004ec558db32e` |
-| Release | [twrp-9.0-szj202-r36754459715](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36754459715) |
+| Run | [36758399531](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36758399531) (stage `recoveryimage`, 21m41s, success) |
+| Image | `recovery.img`, 31,606,784 bytes, SHA-256 `f838186f7a13589acc674831afb0794d4710ac6a3f5a2eb17787f565372daeaa` |
+| Release | [twrp-9.0-szj202-r36758399531](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36758399531) |
 
-ADB works (configfs USB gadget) and the UI no longer hangs: TWRP's crypto/FBE
-support is disabled because this unit's FBE key is TEE-wrapped and would
-deadlock the UI without the vendor Keymaster stack. `/data` therefore mounts as
-plain ext4 and per-file encrypted contents stay unreadable. Details in
-[docs/BUILD_STATUS.md](docs/BUILD_STATUS.md).
+This build adds /data (FBE) decryption, a landscape UI, working USB OTG /
+external SD entries and a Japanese default language. The /data fix patches a
+TWRP `usesKeymaster()` divergence from AOSP that deadlocked recovery in HIDL
+`getService()`; see [docs/BUILD_STATUS.md](docs/BUILD_STATUS.md).
 
 ## Flashing (manual, device owner's responsibility)
 
