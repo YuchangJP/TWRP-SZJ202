@@ -85,6 +85,14 @@ TARGET_OTA_ASSERT_DEVICE := szj202,SZJ202
 # overrides TW_ROTATION at runtime if 90 turns out to be the wrong direction.
 TW_THEME := landscape_hdpi
 TW_ROTATION := 90
+# TWRP rotates the drawing but the touchscreen still reports panel-space
+# coordinates, so the axes have to be swapped and one of them flipped. For
+# gr_rotation == 90 the frame transform is (u, v) = (w - y - 1, x), i.e.
+# x_ui = v and y_ui = (h - u), which is exactly SWAP_XY + FLIP_Y.
+# If tapping lands mirrored, move the flip to RECOVERY_TOUCHSCREEN_FLIP_X
+# (and if it is transposed as well, drop both flips).
+RECOVERY_TOUCHSCREEN_SWAP_XY := true
+RECOVERY_TOUCHSCREEN_FLIP_Y := true
 TW_SCREEN_BLANK_ON_BOOT := true
 TW_USE_TOOLBOX := true
 # Do NOT set TW_EXCLUDE_DEFAULT_USB_INIT: TWRP's etc/init.recovery.usb.rc is

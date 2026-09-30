@@ -281,6 +281,57 @@ Other changes in the same build:
 * **Default language** — `TW_DEFAULT_LANGUAGE := ja`; TWRP ships
   `twres/languages/ja.xml`.
 
+## On-device verification of run 36758399531 (2026-09-30)
+
+The image was flashed and queried over ADB. Two of the four changes are proven
+working, two are not.
+
+**Working**
+
+* **Japanese default** — `I:LANG: ja`, `/twres/languages/ja.xml` loaded, and the
+  UI renders Japanese strings (`MTP 有効`, `内部ストレージ`).
+* **Landscape UI** — rotation is applied (`gr_fb_width() > gr_fb_height()`, so
+  TWRP selected the landscape layout) and the log shows
+  `/twres/landscape.xml` being loaded, with the 1920x1200 theme scaled
+  `0.666667x` on both axes to 1280x800.
+
+**Touch is wrong after the rotation.** TWRP rotates the drawing, but the
+touchscreen still reports panel-space coordinates; `vk_tp_to_screen()` only
+compensates when the device sets the touch flags. For `gr_rotation == 90` the
+frame transform is `(u, v) = (w - y - 1, x)`, i.e. `x_ui = v` and `y_ui = h - u`,
+which is `RECOVERY_TOUCHSCREEN_SWAP_XY` + `RECOVERY_TOUCHSCREEN_FLIP_Y`. Those
+are now set; the mirrored alternative is FLIP_X.
+
+**/data decryption still fails, and the earlier diagnosis was wrong.** The log
+shows the FBE initialisation running three times (the retry loop) and ending in
+
+```
+Key exists, using: /data/unencrypted/key
+Openssl error: 0
+```
+
+`Openssl error: 0` comes from `decryptWithoutKeymaster()` — the GCM tag check
+fails, so the key derived from the secdiscardable does not match the stored
+`encrypted_key`. Together with the 449-byte `keymaster_key_blob` sitting in the
+same directory, that means the FBE device key really is **Keymaster-encrypted**,
+and TWRP's `usesKeymaster()` with `secret.empty()` (true for an empty
+authentication) is intentional, not the typo it was taken for. The patch that
+"restored" the AOSP form therefore sends the device key down the wrong path: it
+no longer deadlocks (that is why patch 1 is still applied), but it can never
+decrypt.
+
+Consequence: `/data` decryption needs the vendor Keymaster stack in recovery —
+`/vendor/bin/qseecomd`, `/vendor/bin/hw/android.hardware.keymaster@3.0-service-qti`
+(or 4.0), `/vendor/lib64/hw/android.hardware.keymaster@3.0-impl-qti.so`,
+`libQSEEComAPI.so`, `libkeymasterdeviceutils.so`, `libkeymasterprovision.so`,
+`libkeymasterutils.so`, `libqtikeymaster4.so` — started from
+`init.recovery.qcom.rc`, with hwservicemanager (already in the ramdisk). Once
+those are present, patch 1 must be dropped so TWRP takes the Keymaster path.
+
+**/external_sd and /usb_otg** now parse as TWRP removable entries (no `wait`),
+and only log `I:Unable to mount` with `Actual block device: ''` because no card
+or stick is attached; the fstab/parse error is gone.
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0
