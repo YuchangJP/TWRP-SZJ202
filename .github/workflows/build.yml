@@ -1,0 +1,238 @@
+name: TWRP 9.0 SZJ202 build
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Last build stage to attempt
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - sync
+          - recoveryimage
+      kernel_repository:
+        description: Optional kernel GitHub owner/repo (root = kernel source); empty uses the prebuilt release asset
+        type: string
+        required: false
+      kernel_ref:
+        description: Existing kernel branch or tag
+        type: string
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+env:
+  DEVICE: szj202
+  TWRP_BRANCH: twrp-9.0
+  MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni
+  KERNEL_RELEASE_TAG: prebuilt-kernel-1.110JS.0151.a
+  KERNEL_SHA256: 23bc66781c6579bb68d2736c7bcf6a8a946cbe6a0960d7c33701e2db19264453
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+    env:
+      STAGE: ${{ inputs.stage }}
+      KERNEL_REPOSITORY: ${{ inputs.kernel_repository }}
+      KERNEL_REF: ${{ inputs.kernel_ref }}
+    steps:
+      - name: Check out build environment and device tree
+        uses: actions/checkout@v4
+        with:
+          path: device-tree
+          persist-credentials: false
+
+      - name: Validate publishable project
+        shell: bash
+        run: |
+          if [[ ! -f device-tree/BoardConfig.mk ]]; then
+            echo 'Select the twrp-9.0 branch when dispatching this workflow.' >&2
+            exit 1
+          fi
+          python3 device-tree/tools/validate_tree.py
+
+      - name: Check build inputs
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_repo() { [[ "$1" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; }
+          check_ref() {
+            [[ "$1" =~ ^[A-Za-z0-9._/-]+$ ]] &&
+            [[ "$1" != -* ]] && [[ "$1" != *..* ]] && [[ "$1" != *//* ]]
+          }
+          if ! check_ref "$GITHUB_REF_NAME"; then
+            echo 'The selected Git branch cannot be safely used in a repo manifest.' >&2
+            exit 1
+          fi
+          if [[ -n "$KERNEL_REPOSITORY" ]] && { ! check_repo "$KERNEL_REPOSITORY" || ! check_ref "$KERNEL_REF"; }; then
+            echo 'Invalid kernel_repository or kernel_ref.' >&2
+            exit 1
+          fi
+
+      - name: Runner cleanup and disk baseline
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+          df -h > diagnostics/disk-before.txt
+          # Remove only preinstalled tools on the ephemeral hosted runner.
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache/CodeQL /usr/share/dotnet
+          df -h > diagnostics/disk-after-cleanup.txt
+
+      - name: Configure 12 GB swap
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h | tee diagnostics/memory.txt
+
+      - name: Install build dependencies
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache curl flex g++-multilib gcc-multilib \
+            git-lfs gperf imagemagick lib32z1-dev libncurses5-dev \
+            libxml2-utils lzop pngcrush schedtool squashfs-tools \
+            unzip xsltproc zip zlib1g-dev
+          # Android 9 still calls a bare "python" in a few build scripts.
+          sudo apt-get install -y --no-install-recommends python2.7 || true
+          if [ -x /usr/bin/python2.7 ]; then
+            sudo update-alternatives --install /usr/bin/python python /usr/bin/python2.7 1
+          fi
+          git lfs install --skip-repo
+
+      - name: Select Java 8
+        if: inputs.stage != 'validate'
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '8'
+
+      - name: Install repo command
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/bin"
+          curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod 755 "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Initialize TWRP manifest and local manifest
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/bin:$PATH"
+          git config --global user.email "ci@localhost"
+          git config --global user.name "CI"
+          mkdir -p workspace
+          cd workspace
+          repo init --depth=1 --no-clone-bundle -u "$MANIFEST_URL" -b "$TWRP_BRANCH"
+          mkdir -p .repo/local_manifests
+          cat > .repo/local_manifests/szj202.xml <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <manifest>
+            <remote name="szj202-github" fetch="https://github.com" />
+            <project name="${GITHUB_REPOSITORY}" path="device/kyocera/szj202" remote="szj202-github" revision="${GITHUB_REF_NAME}" />
+          EOF
+          if [[ -n "$KERNEL_REPOSITORY" ]]; then
+            cat >> .repo/local_manifests/szj202.xml <<EOF
+            <project name="${KERNEL_REPOSITORY}" path="kernel/kyocera/szj202" remote="szj202-github" revision="${KERNEL_REF}" />
+          EOF
+          fi
+          echo '  </manifest>' >> .repo/local_manifests/szj202.xml
+          cp .repo/local_manifests/szj202.xml "$GITHUB_WORKSPACE/diagnostics/local-manifest.xml"
+
+      - name: Sync source tree
+        if: inputs.stage != 'validate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/bin:$PATH"
+          cd workspace
+          repo sync -j4 --force-sync --no-clone-bundle --no-tags 2>&1 |
+            tee "$GITHUB_WORKSPACE/diagnostics/repo-sync.log"
+          test -f device/kyocera/szj202/BoardConfig.mk
+          test -f device/kyocera/szj202/recovery.fstab
+
+      - name: Provide kernel image
+        if: inputs.stage == 'recoveryimage'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p workspace/device/kyocera/szj202/prebuilt
+          out=workspace/device/kyocera/szj202/prebuilt/Image.gz
+          if [[ -n "$KERNEL_REPOSITORY" ]]; then
+            echo 'kernel_repository was set but this tree is configured for the prebuilt kernel.' >&2
+            echo 'Set TARGET_PREBUILT_KERNEL in BoardConfig.mk to the built Image.gz instead.' >&2
+            exit 1
+          fi
+          gh release download "$KERNEL_RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'Image.gz' \
+            --output "$out" --clobber
+          echo "$KERNEL_SHA256  $out" | sha256sum -c -
+          file "$out"
+
+      - name: Build recovery image
+        if: inputs.stage == 'recoveryimage'
+        shell: bash
+        env:
+          LC_ALL: C
+        run: |
+          set -eo pipefail
+          cd workspace
+          source build/envsetup.sh
+          export ALLOW_MISSING_DEPENDENCIES=true
+          lunch omni_szj202-eng
+          mka recoveryimage 2>&1 | tee "$GITHUB_WORKSPACE/diagnostics/build.log"
+
+      - name: Capture diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          df -h > diagnostics/disk-final.txt 2>/dev/null || true
+          free -h > diagnostics/memory-final.txt 2>/dev/null || true
+          printf 'stage=%s\nref=%s\nrun=%s\n' \
+            "$STAGE" "$GITHUB_REF_NAME" "$GITHUB_RUN_ID" > diagnostics/summary.txt
+          img=workspace/out/target/product/szj202/recovery.img
+          if [[ -f "$img" ]]; then
+            python3 device-tree/tools/check_boot_image.py "$img" \
+              > diagnostics/recovery-structure.txt 2>&1 || true
+          fi
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: szj202-diagnostics-${{ github.run_id }}
+          path: diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload recovery image
+        if: success() && inputs.stage == 'recoveryimage'
+        uses: actions/upload-artifact@v4
+        with:
+          name: szj202-twrp-${{ github.run_id }}
+          path: workspace/out/target/product/szj202/recovery.img
+          if-no-files-found: warn
+          retention-days: 14
