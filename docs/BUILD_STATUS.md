@@ -72,6 +72,17 @@ hash before the build. The matching GPL kernel source is the OEM package
   expression, which Python < 3.12 rejects (`SyntaxError: f-string expression
   part cannot include a backslash`). The step is guarded with `|| true` so the
   job still passed, but the tool is now rewritten to avoid it.
+* [Run 36746269355](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36746269355)
+  (stage `recoveryimage`, first ADB fix) synced and configured Soong, then
+  failed at kati's product check:
+
+  ```
+  build/make/core/main.mk:137: error: ADDITIONAL_DEFAULT_PROPERTIES must not
+  be set before here: ro.adb.secure=0.
+  ```
+
+  `ADDITIONAL_DEFAULT_PROPERTIES` is only legal from a product makefile, so
+  `ro.adb.secure=0` moved from `BoardConfig.mk` to `device.mk`.
 
 ## Milestones
 
