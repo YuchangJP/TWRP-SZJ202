@@ -58,6 +58,17 @@ Dispatch the **TWRP 9.0 SZJ202 build** workflow from the `twrp-9.0` branch:
 
 The finished `recovery.img` is uploaded as a workflow artifact.
 
+## Latest build
+
+| | |
+| --- | --- |
+| Run | [36737914000](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36737914000) (stage `recoveryimage`, 15m55s, success) |
+| Image | `recovery.img`, 31,604,736 bytes, SHA-256 `2a43cc83665edeecca13f3ae810b0888640a50bf6a574d85e52a75bde5e050f8` |
+| Release | [twrp-9.0-szj202-r36737914000](https://github.com/YuchangJP/TWRP-SZJ202/releases/tag/twrp-9.0-szj202-r36737914000) |
+
+Build progress and every CI iteration are recorded in
+[docs/BUILD_STATUS.md](docs/BUILD_STATUS.md).
+
 ## Flashing (manual, device owner's responsibility)
 
 ```
