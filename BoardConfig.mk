@@ -74,6 +74,11 @@ TARGET_COPY_OUT_VENDOR := vendor
 
 # ------------------------------------------------------------------- Recovery
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab
+# Private vendor blobs (the Keymaster/QSEE stack) are synced to
+# vendor/kyocera/szj202; the build copies
+# vendor/kyocera/szj202/proprietary/recovery/root/** into the recovery ramdisk.
+# The path is simply absent when the vendor repository is not provided.
+TARGET_RECOVERY_DEVICE_DIRS += vendor/kyocera/szj202/proprietary
 TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
 TARGET_RECOVERY_DEVICE_DIRS += $(DEVICE_PATH)
 TARGET_RECOVERY_QCOM_RTC_FIX := true
@@ -101,13 +106,12 @@ TW_USE_TOOLBOX := true
 TW_EXCLUDE_TWRPAPP := true
 TW_EXTRA_LANGUAGES := true
 TW_DEFAULT_LANGUAGE := ja
-# Crypto/FBE is on again. TWRP's KeyAuthentication::usesKeymaster() drops the
-# '!' before secret.empty() compared with AOSP, so an empty authentication (the
-# FBE device key) wrongly took the Keymaster path and deadlocked recovery, which
-# has no Keymaster HAL. The build patches that back to the AOSP form, makes
-# recovery create its own "e4crypt" keyring, and disables the wrapped-key retry
-# so a failure cannot deadlock. See the workflow's patch step and
-# docs/BUILD_STATUS.md.
+# Crypto/FBE is on. The FBE device key in /data/unencrypted/key is wrapped by
+# the TEE (a 449-byte keymaster_key_blob sits next to it), so TWRP's Keymaster
+# path is the correct one and needs a Keymaster HIDL service plus qseecomd in
+# recovery -- those come from the private vendor repository and are started by
+# recovery/root/init.recovery.qcom.rc. The workflow also patches two TWRP bugs
+# around the same code path (see the patch step and docs/BUILD_STATUS.md).
 TW_INCLUDE_CRYPTO := true
 TW_USE_MODEL_HARDWARE_ID_FOR_DEVICE_ID := true
 TW_DEVICE_VERSION := SZJ202-1
