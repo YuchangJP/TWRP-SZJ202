@@ -29,6 +29,29 @@ from the stock `boot` partition and published as the release asset
 hash before the build. The matching GPL kernel source is the OEM package
 `kernel_SZJ-JS202_1.110JS.0151.a.tar.gz` (source root `kernel/msm-4.9`).
 
+## CI run log
+
+* [Run 36735449778](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36735449778)
+  (stage `recoveryimage`) passed checkout, validation, input checks and the
+  runner cleanup, then stopped while configuring swap: the hosted runner
+  already had an active `/swapfile`, so `fallocate` on that path returned
+  `Text file busy` (exit 1 after 44s). The step now reuses an existing swap or
+  creates one under `$RUNNER_TEMP` instead of hard-coding `/swapfile`.
+* [Run 36735859075](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36735859075)
+  (stage `recoveryimage`) passed swap, dependencies, Java 8, `repo init`, the
+  full `twrp-9.0` sync, and kernel provisioning (release asset downloaded with
+  the recorded SHA-256 verified). The build then failed after the Soong
+  configuration phase:
+
+  ```
+  prebuilts/clang/host/linux-x86/clang-4691093/bin/clang.real:
+    error while loading shared libraries: libtinfo.so.5: cannot open shared object file
+  ```
+
+  The Android 9 prebuilt clang links against `libtinfo.so.5`, which Ubuntu
+  22.04 does not ship by default. `libtinfo5`/`libncurses5` are now installed
+  with the other build dependencies.
+
 ## Milestones
 
 | Milestone | Status | Evidence / next gate |
