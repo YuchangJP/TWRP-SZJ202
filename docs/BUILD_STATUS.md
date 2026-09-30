@@ -51,6 +51,27 @@ hash before the build. The matching GPL kernel source is the OEM package
   The Android 9 prebuilt clang links against `libtinfo.so.5`, which Ubuntu
   22.04 does not ship by default. `libtinfo5`/`libncurses5` are now installed
   with the other build dependencies.
+* [Run 36737914000](https://github.com/YuchangJP/TWRP-SZJ202/actions/runs/36737914000)
+  (stage `recoveryimage`) **succeeded** in 15m55s and produced `recovery.img`
+  (31,604,736 bytes, well below the 64 MiB partition). Structure:
+
+  | Field | Value |
+  | --- | --- |
+  | header_version | 0 |
+  | page_size | 2048 |
+  | kernel | gzip `Image.gz`, 14,334,297 bytes @ 0x80008000 (stock size) |
+  | ramdisk | 17,266,063 bytes @ 0x81000000 (52,134,400 bytes uncompressed) |
+  | cmdline | stock cmdline + `buildvariant=eng` |
+
+  The ramdisk is a complete TWRP rootfs: `sbin/recovery`, 91 files under
+  `twres/`, the embedded Python, and `/etc/recovery.fstab` byte-for-byte the
+  tree's fstab.
+
+  The `Capture diagnostics` step also exposed a host-Python compatibility bug:
+  `tools/check_boot_image.py` used an f-string with a backslash in the
+  expression, which Python < 3.12 rejects (`SyntaxError: f-string expression
+  part cannot include a backslash`). The step is guarded with `|| true` so the
+  job still passed, but the tool is now rewritten to avoid it.
 
 ## Milestones
 
@@ -60,8 +81,8 @@ hash before the build. The matching GPL kernel source is the OEM package
 | Partition table known | Yes | GPT in `mmcblk0`. |
 | Stock recovery fstab extracted | Yes | `recovery` ramdisk. |
 | Device tree authored | Yes | `twrp-9.0` branch. |
-| Prebuilt kernel published | Pending | Release asset must exist before `recoveryimage`. |
-| `recovery.img` build | Pending | First `recoveryimage` dispatch. |
+| Prebuilt kernel published | Yes | Release `prebuilt-kernel-1.110JS.0151.a`. |
+| `recovery.img` build | Yes, structural | Run 36737914000 produced a 31,604,736-byte `recovery.img`. |
 | Device boot / display / touch | Untested | Requires flashing; not performed here. |
 
 ## Known bring-up risks

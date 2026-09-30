@@ -43,8 +43,13 @@ def main() -> int:
 
     koff = page_size
     kernel = data[koff:koff + kernel_size]
-    print(f"kernel magic   : {kernel[:8].hex()} "
-          f"({'gzip Image.gz' if kernel[:2] == b'\x1f\x8b' else 'uncompressed Image' if kernel[:4] == b'ARMd' else 'unknown'})")
+    if kernel[:2] == b"\x1f\x8b":
+        kernel_kind = "gzip Image.gz"
+    elif kernel[:4] == b"ARMd":
+        kernel_kind = "uncompressed Image"
+    else:
+        kernel_kind = "unknown"
+    print(f"kernel magic   : {kernel[:8].hex()} ({kernel_kind})")
 
     roff = align(page_size + kernel_size, page_size)
     ramdisk = data[roff:roff + ramdisk_size]
