@@ -435,6 +435,35 @@ candidates: give the vendor services their own linker (copy `ld-android.so` to
 `sbin/oemlib/linker64` and repoint `PT_INTERP` there), and check the vendor
 binaries' `DT_RUNPATH` for paths that silently resolve to TWRP's libraries.
 
+## Where the Keymaster bring-up stands (2026-10-01, later)
+
+Verified by hand on the device: the vendor binaries **do** run inside recovery
+once their world is set up correctly.
+
+* The ELF interpreter problem is a **mount-order problem**, not a binary
+  problem. This device is system-as-root and the system image's own `/bin` is a
+  symlink to `/system/bin`, so mounting the image straight onto `/system` makes
+  `/system/bin` self-referential and every exec fails with
+  `Too many symbolic links`. Mount the image on `/system_root` and publish
+  `/system/bin`, `/system/lib64` and `/system/lib` as symlinks to
+  `/system_root/system/...`; `/system/bin/linker64` then resolves to the
+  device's own linker and the stock vendor binaries start with their stock
+  interpreter. The earlier `PT_INTERP` rewrite and the second (OEM) runtime in
+  `sbin/oemlib` were both unnecessary and have been reverted.
+* Mounting the modem partition at `/firmware` is required: `qseecomd` loads the
+  Keymaster TA from `/firmware/image`, and recovery never mounts that partition.
+* `hwservicemanager` runs and the `android.hardware.keymaster@4.0-service-qti`
+  service stays resident (verified with `ps`).
+
+Still open: **`qseecomd` exits immediately and silently** (no stdout, no
+stderr, no process left), so the TEE never serves the Keymaster key operation
+and `/data` stays encrypted. `e4crypt_initialize_global_de` returns fail three
+times and the UI continues normally. Next things to try: check whether qseecomd
+needs `/vendor` mounted (or `/data/vendor/qseecom`), run it under
+`strace`/`LD_DEBUG`, compare with the stock boot where it is started from
+`/vendor/etc/init/hw/init.target.rc` as `vendor.qseecomd`, and inspect
+`vendor.sys.listeners.registered` (the vendor helper script waits for it).
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0

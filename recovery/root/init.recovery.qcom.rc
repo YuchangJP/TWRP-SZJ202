@@ -68,12 +68,19 @@ on fs
 # The Keymaster stack needed to unwrap the FBE device key. qseecomd loads its TA
 # from the modem partition, which recovery never mounts on its own, and
 # hwservicemanager has to be listening before the Keymaster service starts.
-# /system has to be mounted first: the vendor binaries' ELF interpreter is
-# /system/bin/linker64, and while /system is only a bare mount point that path
-# does not exist, so exec would fail with ENOENT.
+#
+# The vendor binaries' ELF interpreter is /system/bin/linker64. This device is
+# system-as-root: the system image's own /bin is a symlink to /system/bin, so
+# mounting the image directly on /system makes that path self-referential
+# ("Too many symbolic links"). Mount it on /system_root and publish the few
+# paths the binaries need as symlinks instead.
 on post-fs-data
     setprop twrp.dbg.pfd 1
-    mount ext4 ro /dev/block/bootdevice/by-name/system /system
+    mkdir /system_root 0775 root root
+    mount ext4 ro /dev/block/bootdevice/by-name/system /system_root
+    symlink /system_root/system/bin /system/bin
+    symlink /system_root/system/lib64 /system/lib64
+    symlink /system_root/system/lib /system/lib
     mount vfat ro /dev/block/bootdevice/by-name/modem /firmware
     start hwservicemanager
 
