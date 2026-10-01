@@ -63,16 +63,20 @@ on property:sys.usb.ffs.ready=1
 on fs
     wait /dev/block/platform/soc/${ro.boot.bootdevice}
     symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
-    # qseecomd loads the Keymaster TA from the modem partition; recovery never
-    # mounts it on its own.
+    setprop twrp.dbg.fs 1
+
+# The Keymaster stack needed to unwrap the FBE device key. qseecomd loads its TA
+# from the modem partition, which recovery never mounts on its own, and
+# hwservicemanager has to be listening before the Keymaster service starts.
+# post-fs-data runs after /dev is populated and before `boot`, so the stack is
+# up before TWRP's recovery service reaches the FBE init.
+on post-fs-data
+    setprop twrp.dbg.pfd 1
     mount vfat ro /dev/block/bootdevice/by-name/modem /firmware
-    # HIDL service manager first; qseecomd and Keymaster wait for it below.
     start hwservicemanager
 
-# The Keymaster stack needed to unwrap the FBE device key. hwservicemanager
-# sets hwservicemanager.ready once it is listening, which is the ordering the
-# vendor init uses too.
 on property:hwservicemanager.ready=true
+    setprop twrp.dbg.hws 1
     start vendor.qseecomd
     start keymaster-4-0
 
