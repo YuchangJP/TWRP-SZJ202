@@ -118,7 +118,7 @@ hash before the build. The matching GPL kernel source is the OEM package
 | ADB over USB | **Yes, verified** | See the hardware verification section. |
 | Storage / touch / partitions | Yes, verified | Read-only ADB checks; see below. |
 | TWRP UI / main menu | Fixed, unverified | Crypto patch applied; run 36758399531. |
-| /data (FBE) decryption | Implemented, unverified | Same run; proof requires flashing. |
+| /data (FBE) decryption | **Yes, verified** | Build 36868455717: /data and /sdcard show decoded names. |
 | Radios (modem/Wi-Fi/BT) | Untested | Requires the user on hardware. |
 
 ## Hardware verification (2026-09-30)
@@ -463,6 +463,39 @@ needs `/vendor` mounted (or `/data/vendor/qseecom`), run it under
 `strace`/`LD_DEBUG`, compare with the stock boot where it is started from
 `/vendor/etc/init/hw/init.target.rc` as `vendor.qseecomd`, and inspect
 `vendor.sys.listeners.registered` (the vendor helper script waits for it).
+
+## /data decryption works (2026-10-01, build 36868455717)
+
+Confirmed on hardware: `/sdcard` shows `0`, `TWRP`, `obb`, and `/data` lists
+`app`, `app-asec`, `anr`, ... — the encrypted view is gone and
+`e4crypt_initialize_global_de` no longer fails.
+
+The working recipe, all of it in `recovery/root/init.recovery.qcom.rc` plus the
+two mirrors in the private vendor repository:
+
+1. Mount the system image on **`/system_root`** (not `/system`) and publish
+   `/system/bin`, `/system/lib64`, `/system/lib` as symlinks to
+   `/system_root/system/...`. The image is system-as-root and its own `/bin`
+   links to `/system/bin`; mounting it on `/system` makes that path
+   self-referential and every vendor exec fails with `Too many symbolic links`.
+   With the symlinks, `/system/bin/linker64` resolves to the device's linker and
+   the stock vendor binaries run with their **stock** interpreter.
+2. Mount **`/vendor`** and **`/firmware`** from `recovery/root/sbin/setup-extra-mounts.sh`
+   called with `exec u:r:su:s0 root root --`: init's `mount` builtin refuses
+   those two partitions, and qseecomd needs both (`/firmware/image` holds the
+   Keymaster TA and it only stays resident when `/vendor` is mounted).
+3. Every service **and** every `exec` line needs `seclabel u:r:su:s0`; without a
+   context init silently skips it. `hwservicemanager` starts first, and
+   `vendor.qseecomd` and `keymaster-4-0` start on
+   `on property:hwservicemanager.ready=true`.
+4. The services run as **root**: the ramdisk files land as `0750 root:root`, so
+   a `system` uid cannot `execve` them.
+5. `LD_LIBRARY_PATH` for the two vendor services is
+   `/sbin:/vendor/lib64:/system/lib64`.
+
+Things that turned out **not** to be needed and were reverted: rewriting the
+vendor binaries' `PT_INTERP`, and shipping a second (OEM) runtime under
+`sbin/oemlib`.
 
 ## Known bring-up risks
 
