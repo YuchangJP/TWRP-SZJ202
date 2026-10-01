@@ -92,6 +92,7 @@ on property:hwservicemanager.ready=true
     setprop twrp.dbg.hws 1
     start vendor.qseecomd
     start keymaster-4-0
+    start gatekeeper-1-0
 
 # init refuses to start a service whose binary has no SELinux domain transition,
 # so every one of these needs an explicit seclabel. u:r:su:s0 is the permissive
@@ -113,6 +114,16 @@ service vendor.qseecomd /sbin/qseecomd
     env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
 
 service keymaster-4-0 /sbin/android.hardware.keymaster@4.0-service-qti
+    class early_hal
+    user root
+    group root
+    seclabel u:r:su:s0
+    env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
+
+# Gatekeeper verifies the lockscreen credential, which is what turns the CE
+# (credential-encrypted) storage under /data/data readable once TWRP's decrypt
+# screen is given the PIN/pattern/password. TWRP uses the HIDL 1.0 interface.
+service gatekeeper-1-0 /sbin/android.hardware.gatekeeper@1.0-service-qti
     class early_hal
     user root
     group root
