@@ -265,21 +265,25 @@ jobs:
           #    down the FDE/crypto-footer path.
           p = root / "Ext4CryptPie.cpp"
           s = p.read_text()
-          old5 = '''        if (!prepare_dir(user_key_dir, 0700, AID_ROOT, AID_ROOT)) return false;
-        if (!prepare_dir(user_key_dir + "/ce", 0700, AID_ROOT, AID_ROOT)) return false;
-        if (!prepare_dir(user_key_dir + "/de", 0700, AID_ROOT, AID_ROOT)) return false;
-        if (!android::vold::pathExists(get_de_key_path(0))) {
-            if (!create_and_install_user_keys(0, false)) return false;
-        }
-        // TODO: switch to loading only DE_0 here once framework makes
-        // explicit calls to install DE keys for secondary users
-        if (!load_all_de_keys()) return false;'''
-          new5 = '''        /* patched: not reachable before the credential is entered */
-        (void)prepare_dir(user_key_dir, 0700, AID_ROOT, AID_ROOT);
-        (void)prepare_dir(user_key_dir + "/ce", 0700, AID_ROOT, AID_ROOT);
-        (void)prepare_dir(user_key_dir + "/de", 0700, AID_ROOT, AID_ROOT);
-        if (android::vold::pathExists(get_de_key_path(0)))
-            (void)load_all_de_keys();'''
+          old5 = "\n".join([
+              '        if (!prepare_dir(user_key_dir, 0700, AID_ROOT, AID_ROOT)) return false;',
+              '        if (!prepare_dir(user_key_dir + "/ce", 0700, AID_ROOT, AID_ROOT)) return false;',
+              '        if (!prepare_dir(user_key_dir + "/de", 0700, AID_ROOT, AID_ROOT)) return false;',
+              '        if (!android::vold::pathExists(get_de_key_path(0))) {',
+              '            if (!create_and_install_user_keys(0, false)) return false;',
+              '        }',
+              '        // TODO: switch to loading only DE_0 here once framework makes',
+              '        // explicit calls to install DE keys for secondary users',
+              '        if (!load_all_de_keys()) return false;',
+          ])
+          new5 = "\n".join([
+              '        /* patched: not reachable before the credential is entered */',
+              '        (void)prepare_dir(user_key_dir, 0700, AID_ROOT, AID_ROOT);',
+              '        (void)prepare_dir(user_key_dir + "/ce", 0700, AID_ROOT, AID_ROOT);',
+              '        (void)prepare_dir(user_key_dir + "/de", 0700, AID_ROOT, AID_ROOT);',
+              '        if (android::vold::pathExists(get_de_key_path(0)))',
+              '            (void)load_all_de_keys();',
+          ])
           if old5 in s:
               p.write_text(s.replace(old5, new5, 1))
               print("patched e4crypt_init_user0")
