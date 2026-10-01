@@ -228,18 +228,13 @@ jobs:
           else:
               problems.append("keyring patch did not apply")
 
-          # 2. If the device key cannot be decrypted, TWRP retries with
-          #    fbe.data.wrappedkey=true, which needs the Keymaster HAL and would
-          #    deadlock this device. Fail gracefully instead.
-          p = pathlib.Path("workspace/bootable/recovery/partition.cpp")
-          s = p.read_text()
-          bad3 = 'property_set("fbe.data.wrappedkey", "true");'
-          if bad3 in s:
-              p.write_text(s.replace(
-                  bad3, '/* patched: no Keymaster HAL in recovery; do not retry as wrapped */', 1))
-              print("patched wrapped-key retry in", p.name)
-          else:
-              problems.append("wrapped-key retry patch did not apply")
+          # 2. (removed) A patch used to strip the fbe.data.wrappedkey=true retry
+          #    out of partition.cpp, from when there was no working Keymaster HAL
+          #    and the retry deadlocked. The 4.0 service works now and this
+          #    Android 9 device stores the device key in the wrapped form, so
+          #    the retry is exactly what gets the key decrypted: without it
+          #    e4crypt_initialize_global_de() fails and TWRP falls back to the
+          #    FDE path.
 
           # 3. The QTI HIDL gatekeeper implementation aborts in recovery inside
           #    the KeymasterUtils constructor ("get_version status failed"), and
