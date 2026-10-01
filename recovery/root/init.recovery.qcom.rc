@@ -81,6 +81,7 @@ on post-fs-data
     symlink /system_root/system/bin /system/bin
     symlink /system_root/system/lib64 /system/lib64
     symlink /system_root/system/lib /system/lib
+    mount ext4 ro /dev/block/bootdevice/by-name/vendor /vendor
     mount vfat ro /dev/block/bootdevice/by-name/modem /firmware
     start hwservicemanager
 
@@ -93,8 +94,8 @@ on property:hwservicemanager.ready=true
 # so every one of these needs an explicit seclabel. u:r:su:s0 is the permissive
 # domain TWRP already uses for its root processes. They also have to run as root:
 # the ramdisk files land as 0750 root:root, so a `system` uid cannot execve them.
-# The vendor binaries use the device's own linker (via /system/bin/linker64) and
-# pick up the system libs they need (libicu*) from the mounted /system.
+# qseecomd only stays alive when /vendor is mounted, so the vendor libs are on
+# the search path as well.
 service hwservicemanager /sbin/hwservicemanager
     class core
     user root
@@ -106,14 +107,14 @@ service vendor.qseecomd /sbin/qseecomd
     user root
     group root
     seclabel u:r:su:s0
-    env LD_LIBRARY_PATH /sbin:/system/lib64
+    env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
 
 service keymaster-4-0 /sbin/android.hardware.keymaster@4.0-service-qti
     class early_hal
     user root
     group root
     seclabel u:r:su:s0
-    env LD_LIBRARY_PATH /sbin:/system/lib64
+    env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
 
 # Runs after the functionfs mount in init.rc's "on fs" action.
 on boot
