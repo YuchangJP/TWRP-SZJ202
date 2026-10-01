@@ -290,6 +290,39 @@ jobs:
           else:
               problems.append("e4crypt_init_user0 patch did not apply")
 
+          # 5. Diagnostics: /data still falls back to the FDE path, so log every
+          #    FBE decision point. These are best-effort (warnings, not errors).
+          diag = [
+              ("crypto/ext4crypt/Decrypt.cpp",
+               '#include "Decrypt.h"',
+               '#include "Decrypt.h"\n#include <android-base/logging.h>'),
+              ("crypto/ext4crypt/Decrypt.cpp",
+               '\tprintf("e4crypt_initialize_global_de returned fail\\n");',
+               '\tprintf("e4crypt_initialize_global_de returned fail\\n");\n'
+               '\tLOG(INFO) << "DBG Decrypt_DE: global DE failed" << std::endl;'),
+              ("crypto/ext4crypt/Decrypt.cpp",
+               '\tprintf("e4crypt_init_user0 returned fail\\n");',
+               '\tprintf("e4crypt_init_user0 returned fail\\n");\n'
+               '\tLOG(INFO) << "DBG Decrypt_DE: init_user0 failed" << std::endl;'),
+              ("partition.cpp",
+               '\tDataManager::SetValue(TW_IS_FBE, 0);\n\treturn false;',
+               '\tLOGINFO("DBG Decrypt_FBE_DE: failed, clearing TW_IS_FBE\\n");\n'
+               '\tDataManager::SetValue(TW_IS_FBE, 0);\n\treturn false;'),
+              ("partition.cpp",
+               '\t\tif (Key_Directory.empty()) {\n\t\t\tIs_FBE = false;',
+               '\t\tLOGINFO("DBG Setup_Data_Partition: fbe=self, key dir empty=%d\\n",\n'
+               '\t\t        (int)Key_Directory.empty());\n'
+               '\t\tif (Key_Directory.empty()) {\n\t\t\tIs_FBE = false;'),
+          ]
+          for rel, old6, new6 in diag:
+              p = pathlib.Path("workspace/bootable/recovery") / rel
+              s = p.read_text()
+              if old6 in s:
+                  p.write_text(s.replace(old6, new6, 1))
+                  print("diagnostic added to", rel)
+              else:
+                  print("diagnostic could not be added to", rel, file=sys.stderr)
+
           if problems:
               print("TWRP patches failed: " + "; ".join(problems), file=sys.stderr)
               sys.exit(1)
