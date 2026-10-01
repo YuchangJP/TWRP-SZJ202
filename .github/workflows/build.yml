@@ -323,6 +323,46 @@ jobs:
               else:
                   print("diagnostic could not be added to", rel, file=sys.stderr)
 
+          # 6. init starts the vendor HALs asynchronously, and recovery gets to
+          #    its /data setup first. When the keymaster service is not
+          #    registered yet, the HIDL client falls back to the QTI passthrough
+          #    implementation, which aborts inside the recovery process
+          #    ("Configure failed" out of libqtikeymaster4.so), taking TWRP down
+          #    with it. Wait for the service before touching the device key.
+          p = root / "Decrypt.cpp"
+          s = p.read_text()
+          old8 = '#include "Decrypt.h"'
+          new8 = "\n".join([
+              '#include "Decrypt.h"',
+              '#include <unistd.h>',
+              '#include <cutils/properties.h>',
+          ])
+          if old8 in s:
+              p.write_text(s.replace(old8, new8, 1))
+              print("added headers for the HAL wait")
+          else:
+              problems.append("header patch did not apply")
+
+          old7 = "bool Decrypt_DE() {\n\tif (!e4crypt_initialize_global_de()) {"
+          new7 = "\n".join([
+              "bool Decrypt_DE() {",
+              "\t/* patched: wait for the keymaster HAL so that getService() does not",
+              "\t   fall back to the passthrough implementation, which aborts here */",
+              "\tfor (int i = 0; i < 200; i++) {",
+              "\t\tchar hal_state[PROPERTY_VALUE_MAX];",
+              "\t\tproperty_get(\"init.svc.keymaster-4-0\", hal_state, \"\");",
+              "\t\tif (strcmp(hal_state, \"running\") == 0)",
+              "\t\t\tbreak;",
+              "\t\tusleep(50000);",
+              "\t}",
+              "\tif (!e4crypt_initialize_global_de()) {",
+          ])
+          if old7 in s:
+              p.write_text(s.replace(old7, new7, 1))
+              print("patched Decrypt_DE to wait for the keymaster HAL")
+          else:
+              problems.append("keymaster wait patch did not apply")
+
           if problems:
               print("TWRP patches failed: " + "; ".join(problems), file=sys.stderr)
               sys.exit(1)
