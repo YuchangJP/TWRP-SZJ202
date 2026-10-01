@@ -10,4 +10,16 @@ mount -t vfat -o ro /dev/block/bootdevice/by-name/modem /firmware 2>/dev/null
 # qseecomd reads the Keymaster TA from /firmware/image.
 [ -d /firmware/image ] && setprop twrp.dbg.fw 1
 [ -d /vendor/bin ] && setprop twrp.dbg.ven 1
+
+# The QTI Keymaster 3.0 and Gatekeeper passthrough implementations abort as soon
+# as they are opened in recovery ("get_version status failed" out of
+# KeymasterUtils - the TA they look for is not on this device). TWRP's Keymaster
+# wrapper probes every HAL version, so simply having those files on disk takes
+# the recovery process down with it. Shadow them with /dev/null: the passthrough
+# fetch then finds nothing and the probe is skipped instead.
+for f in \
+    /vendor/lib64/hw/android.hardware.keymaster@3.0-impl-qti.so \
+    /vendor/lib64/hw/android.hardware.gatekeeper@1.0-impl-qti.so ; do
+    [ -f "$f" ] && mount -o bind /dev/null "$f" 2>/dev/null
+done
 exit 0

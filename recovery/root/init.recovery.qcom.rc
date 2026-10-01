@@ -92,8 +92,6 @@ on property:hwservicemanager.ready=true
     setprop twrp.dbg.hws 1
     start vendor.qseecomd
     start keymaster-4-0
-    start keymaster-3-0
-    start gatekeeper-1-0
 
 # init refuses to start a service whose binary has no SELinux domain transition,
 # so every one of these needs an explicit seclabel. u:r:su:s0 is the permissive
@@ -121,30 +119,18 @@ service keymaster-4-0 /sbin/android.hardware.keymaster@4.0-service-qti
     seclabel u:r:su:s0
     env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
 
-# TWRP's Keymaster wrapper probes the HALs in order (4.0, 3.0, ...). If the 3.0
-# interface has no binderized service it is fetched as a passthrough module, and
-# the QTI 3.0 implementation aborts on open inside the recovery process
-# ("Configure failed" -> SIGABRT), which kills recovery during /data setup. The
-# device ships a 3.0 service, so start it as well and the fetch stays out of
-# process.
-service keymaster-3-0 /sbin/android.hardware.keymaster@3.0-service-qti
-    class early_hal
-    user root
-    group root
-    seclabel u:r:su:s0
-    env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
+# TWRP's Keymaster wrapper probes every HAL version (4.0, 3.0, ...). The 3.0
+# interface has no working implementation on this device - its QTI HAL aborts on
+# open in recovery with "get_version status failed" because the TA it expects is
+# not present - so setup-extra-mounts.sh shadows the passthrough library with
+# /dev/null and the probe is skipped. Only the 4.0 service is started here.
 
 # Gatekeeper, which verifies the lockscreen credential and so unlocks the CE
-# storage under /data/data. TWRP's synthetic-password path (the one Android 9
-# uses) calls the HIDL 1.0 interface, so the device's own service is shipped
-# here. It currently aborts during init in the KeymasterUtils constructor with
-# "get_version status failed" - that is the remaining piece of CE support.
-service gatekeeper-1-0 /sbin/android.hardware.gatekeeper@1.0-service-qti
-    class early_hal
-    user root
-    group root
-    seclabel u:r:su:s0
-    env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
+# storage under /data/data, is the remaining piece: TWRP's synthetic-password
+# path needs the HIDL 1.0 interface, and this device's QTI implementation also
+# aborts on open in recovery for the same reason, so /data/data stays locked.
+# The passthrough library is shadowed as well, so the failure is clean rather
+# than a crash.
 
 # Runs after the functionfs mount in init.rc's "on fs" action.
 on boot
