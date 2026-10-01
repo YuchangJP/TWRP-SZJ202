@@ -92,6 +92,7 @@ on property:hwservicemanager.ready=true
     setprop twrp.dbg.hws 1
     start vendor.qseecomd
     start keymaster-4-0
+    start gatekeeper-1-0
 
 # init refuses to start a service whose binary has no SELinux domain transition,
 # so every one of these needs an explicit seclabel. u:r:su:s0 is the permissive
@@ -120,11 +121,16 @@ service keymaster-4-0 /sbin/android.hardware.keymaster@4.0-service-qti
     env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
 
 # Gatekeeper, which verifies the lockscreen credential and so unlocks the CE
-# storage under /data/data, is taken from the device's legacy hw module
-# gatekeeper.msm8937.so through hw_get_module: the QTI HIDL implementation
-# aborts in recovery (KeymasterUtils ctor, "get_version status failed").
-# The build therefore leaves HAVE_GATEKEEPER1 undefined, and /vendor has to
-# stay mounted for hw_get_module to find the module.
+# storage under /data/data. TWRP's synthetic-password path (the one Android 9
+# uses) calls the HIDL 1.0 interface, so the device's own service is shipped
+# here. It currently aborts during init in the KeymasterUtils constructor with
+# "get_version status failed" - that is the remaining piece of CE support.
+service gatekeeper-1-0 /sbin/android.hardware.gatekeeper@1.0-service-qti
+    class early_hal
+    user root
+    group root
+    seclabel u:r:su:s0
+    env LD_LIBRARY_PATH /sbin:/vendor/lib64:/system/lib64
 
 # Runs after the functionfs mount in init.rc's "on fs" action.
 on boot

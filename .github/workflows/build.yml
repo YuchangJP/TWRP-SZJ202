@@ -241,20 +241,18 @@ jobs:
           else:
               problems.append("wrapped-key retry patch did not apply")
 
-          # 3. The device's QTI HIDL gatekeeper implementation aborts in
-          #    recovery ("get_version status failed" out of the KeymasterUtils
-          #    constructor), so build TWRP against the legacy hw module instead:
-          #    Decrypt.cpp then loads gatekeeper.<ro.board.platform>.so
-          #    (gatekeeper.msm8937.so) through hw_get_module.
+          # 3. The QTI HIDL gatekeeper implementation aborts in recovery inside
+          #    the KeymasterUtils constructor ("get_version status failed"), and
+          #    TWRP's synthetic-password path calls the HIDL interface
+          #    unconditionally, so the define has to stay: dropping it does not
+          #    compile. The service is shipped and started instead, so at least
+          #    the failure is visible in the log.
           p = pathlib.Path("workspace/bootable/recovery/crypto/ext4crypt/Android.mk")
           s = p.read_text()
-          bad4 = "LOCAL_CFLAGS += -DHAVE_GATEKEEPER1"
-          if bad4 in s:
-              p.write_text(s.replace(
-                  bad4, "# patched out: use the legacy gatekeeper hw module", 1))
-              print("disabled HAVE_GATEKEEPER1")
+          if "LOCAL_CFLAGS += -DHAVE_GATEKEEPER1" in s:
+              print("HAVE_GATEKEEPER1 kept")
           else:
-              problems.append("gatekeeper patch did not apply")
+              problems.append("HAVE_GATEKEEPER1 is missing")
 
           # 4. e4crypt_init_user0() insists on the legacy per-user key directory
           #    /data/misc/vold/user_keys, which cannot be created while /data is
