@@ -246,7 +246,7 @@ jobs:
           #    constructor), so build TWRP against the legacy hw module instead:
           #    Decrypt.cpp then loads gatekeeper.<ro.board.platform>.so
           #    (gatekeeper.msm8937.so) through hw_get_module.
-          p = pathlib.Path("workspace/bootable/recovery/Android.mk")
+          p = pathlib.Path("workspace/bootable/recovery/crypto/ext4crypt/Android.mk")
           s = p.read_text()
           bad4 = "LOCAL_CFLAGS += -DHAVE_GATEKEEPER1"
           if bad4 in s:
