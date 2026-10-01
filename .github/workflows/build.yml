@@ -241,21 +241,6 @@ jobs:
           else:
               problems.append("wrapped-key retry patch did not apply")
 
-          # 3. The device's QTI HIDL gatekeeper implementation aborts in
-          #    recovery ("get_version status failed"), so build TWRP against the
-          #    legacy hw module path instead: Decrypt.cpp then loads
-          #    gatekeeper.<ro.board.platform>.so (gatekeeper.msm8937.so) via
-          #    hw_get_module, which does exist on the device.
-          p = pathlib.Path("workspace/bootable/recovery/Android.mk")
-          s = p.read_text()
-          bad4 = "LOCAL_CFLAGS += -DHAVE_GATEKEEPER1"
-          if bad4 in s:
-              p.write_text(s.replace(
-                  bad4, "# patched out: use the legacy gatekeeper hw module", 1))
-              print("disabled HAVE_GATEKEEPER1")
-          else:
-              problems.append("gatekeeper patch did not apply")
-
           if problems:
               print("TWRP patches failed: " + "; ".join(problems), file=sys.stderr)
               sys.exit(1)
