@@ -81,8 +81,8 @@ on post-fs-data
     symlink /system_root/system/bin /system/bin
     symlink /system_root/system/lib64 /system/lib64
     symlink /system_root/system/lib /system/lib
-    mount ext4 /dev/block/bootdevice/by-name/vendor /vendor ro
-    mount vfat /dev/block/bootdevice/by-name/modem /firmware ro
+    # /vendor and /firmware refuse init's mount builtin; the shell's mount works.
+    exec - root root -- /sbin/setup-extra-mounts.sh
     start hwservicemanager
 
 on property:hwservicemanager.ready=true
