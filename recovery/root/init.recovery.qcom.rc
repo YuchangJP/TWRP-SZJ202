@@ -82,7 +82,10 @@ on post-fs-data
     symlink /system_root/system/lib64 /system/lib64
     symlink /system_root/system/lib /system/lib
     # /vendor and /firmware refuse init's mount builtin; the shell's mount works.
-    exec - root root -- /sbin/setup-extra-mounts.sh
+    # Like the services, the exec needs an explicit SELinux context or init
+    # silently skips it.
+    exec u:r:su:s0 root root -- /sbin/setup-extra-mounts.sh
+    setprop twrp.dbg.mnt 1
     start hwservicemanager
 
 on property:hwservicemanager.ready=true
