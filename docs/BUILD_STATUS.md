@@ -394,6 +394,47 @@ tree and workflow are otherwise unchanged. Result: run 36768963127,
 **Not yet verified on hardware** — the device dropped off ADB before the new
 image could be written.
 
+## Keymaster stack bring-up inside recovery (2026-10-01)
+
+Getting the QTI Keymaster service to run in TWRP's recovery needed four
+separate fixes, found one at a time on hardware:
+
+1. **ELF interpreter.** The vendor binaries carry
+   `PT_INTERP=/system/bin/linker64`, which does not exist in recovery —
+   `/system` is only a mount point and gets hidden when TWRP mounts the real
+   partition. Exec failed with `ENOENT`. The interpreter string is rewritten to
+   `/sbin/linker64` in the vendor repository (same length or shorter, NUL
+   padded, `PT_INTERP` size unchanged).
+2. **SELinux domain.** init refused to start them:
+   `service /sbin/hwservicemanager does not have a SELinux domain defined` —
+   the ramdisk labels the file `rootfs:s0` and there is no transition. Each
+   service now carries `seclabel u:r:su:s0`, the permissive domain TWRP already
+   uses for its root processes.
+3. **Exec permission.** With `user system`, init reported
+   `cannot execve('/sbin/hwservicemanager'): Permission denied`: the ramdisk
+   files are mode `0750 root:root`, so a non-owner uid cannot execute them.
+   The services now run as root.
+4. **Runtime ABI.** The vendor binaries cannot resolve symbols against TWRP's
+   AOSP runtime (`cannot locate symbol ""`), so `sbin/oemlib` carries their
+   whole `DT_NEEDED` closure taken from the device's system image
+   (`libc`, `libc++`, `libutils`, `libhidl*`, `libicu*`, ...), and only the two
+   vendor services get that path first.
+
+State after 1-3: `hwservicemanager` runs, `hwservicemanager.ready=true`, the
+`on property:` trigger starts both vendor services, and — importantly — the FBE
+init **no longer deadlocks**. It now returns
+`e4crypt_initialize_global_de returned fail` three times and the UI comes up
+normally, so the recovery is usable while the Keymaster stack is still being
+made to link.
+
+Still open: with the full OEM runtime staged in `oemlib`, `qseecomd` and
+`android.hardware.keymaster@4.0-service-qti` still fail to link
+(`cannot locate symbol ""`), so `/data` is not decrypted yet. Running the OEM
+linker standalone (`ld-android.so`) exits with `Illegal instruction`. Next
+candidates: give the vendor services their own linker (copy `ld-android.so` to
+`sbin/oemlib/linker64` and repoint `PT_INTERP` there), and check the vendor
+binaries' `DT_RUNPATH` for paths that silently resolve to TWRP's libraries.
+
 ## Known bring-up risks
 
 * **Boot image header version.** Stock uses header v1; the TWRP build emits v0
