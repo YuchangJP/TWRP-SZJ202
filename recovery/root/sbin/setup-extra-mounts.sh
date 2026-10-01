@@ -15,11 +15,17 @@ mount -t vfat -o ro /dev/block/bootdevice/by-name/modem /firmware 2>/dev/null
 # as they are opened in recovery ("get_version status failed" out of
 # KeymasterUtils - the TA they look for is not on this device). TWRP's Keymaster
 # wrapper probes every HAL version, so simply having those files on disk takes
-# the recovery process down with it. Shadow them with /dev/null: the passthrough
-# fetch then finds nothing and the probe is skipped instead.
+# the recovery process down with it. Shadow them with an empty file: the
+# passthrough fetch then finds nothing and the probe is skipped instead.
+#
+# The source has to be a regular file. toybox mount treats an argument like
+# /dev/null as an image and fails with "losetup failed", which is why this is
+# not a /dev/null bind.
+SHADOW=/tmp/hal-shadow
+: > "$SHADOW"
 for f in \
     /vendor/lib64/hw/android.hardware.keymaster@3.0-impl-qti.so \
     /vendor/lib64/hw/android.hardware.gatekeeper@1.0-impl-qti.so ; do
-    [ -f "$f" ] && mount -o bind /dev/null "$f" 2>/dev/null
+    [ -f "$f" ] && mount -o bind "$SHADOW" "$f" 2>/dev/null
 done
 exit 0
