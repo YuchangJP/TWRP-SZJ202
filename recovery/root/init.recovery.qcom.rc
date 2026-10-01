@@ -82,12 +82,14 @@ on property:hwservicemanager.ready=true
 
 # init refuses to start a service whose binary has no SELinux domain transition,
 # so every one of these needs an explicit seclabel. u:r:su:s0 is the permissive
-# domain TWRP already uses for its root processes. The vendor binaries also need
-# their own HIDL runtime (different ABI from TWRP's), hence /sbin/oemlib first.
+# domain TWRP already uses for its root processes. They also have to run as root:
+# the ramdisk files land as 0750 root:root, so a `system` uid cannot execve them.
+# The vendor binaries additionally need their own HIDL runtime (different ABI
+# from TWRP's), hence /sbin/oemlib first.
 service hwservicemanager /sbin/hwservicemanager
     class core
-    user system
-    group system readproc
+    user root
+    group root
     seclabel u:r:su:s0
 
 service vendor.qseecomd /sbin/qseecomd
@@ -99,8 +101,8 @@ service vendor.qseecomd /sbin/qseecomd
 
 service keymaster-4-0 /sbin/android.hardware.keymaster@4.0-service-qti
     class early_hal
-    user system
-    group system drmrpc
+    user root
+    group root
     seclabel u:r:su:s0
     env LD_LIBRARY_PATH /sbin/oemlib:/sbin
 
