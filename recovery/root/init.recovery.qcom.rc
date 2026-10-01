@@ -77,12 +77,12 @@ on fs
 on post-fs-data
     setprop twrp.dbg.pfd 1
     mkdir /system_root 0775 root root
-    mount ext4 ro /dev/block/bootdevice/by-name/system /system_root
+    mount ext4 /dev/block/bootdevice/by-name/system /system_root ro
     symlink /system_root/system/bin /system/bin
     symlink /system_root/system/lib64 /system/lib64
     symlink /system_root/system/lib /system/lib
-    mount ext4 ro /dev/block/bootdevice/by-name/vendor /vendor
-    mount vfat ro /dev/block/bootdevice/by-name/modem /firmware
+    mount ext4 /dev/block/bootdevice/by-name/vendor /vendor ro
+    mount vfat /dev/block/bootdevice/by-name/modem /firmware ro
     start hwservicemanager
 
 on property:hwservicemanager.ready=true
